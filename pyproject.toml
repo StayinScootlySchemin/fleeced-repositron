@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "fleeced-repositron"
+version = "0.1.0"
+description = "ChatGPT export ingestor and agent framework"
+authors = ["AI <ai@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pgvector = "*"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+ruff = "*"
+
+[tool.poetry.scripts]
+ingest-chatgpt = "scripts.ingest_chatgpt:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
