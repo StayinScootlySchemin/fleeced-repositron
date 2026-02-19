@@ -1,0 +1,22 @@
+{
+  "rack": {"width": 1800, "depth": 550, "height": 1050},
+  "hole_pitch": 40,
+  "unusable_holes": [0, 1, 2],
+  "scooter": {
+    "deck_width": 170,
+    "deck_length": 640,
+    "deck_height": 150,
+    "handlebar_width": 500,
+    "stem_offset": 90
+  },
+  "constraints": {
+    "side_clearance": 30,
+    "front_clearance": 40,
+    "rear_clearance": 35,
+    "top_clearance": 80,
+    "allowed_overhang": 25,
+    "access_sides": ["right"],
+    "stagger_offsets": [0, 25]
+  },
+  "top_n": 3
+}
