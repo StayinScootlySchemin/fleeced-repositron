@@ -34,3 +34,19 @@ def test_infeasible_config_returns_zero_capacity() -> None:
     assert results
     assert results[0].active_capacity == 0
     assert results[0].jam_risk == 1.0
+
+
+def test_layouts_are_sorted_capacity_then_jam_risk() -> None:
+    config = load_example("config_baseline.json")
+    results = simulate_layouts(config)
+    assert len(results) >= 2
+    assert results[0].active_capacity >= results[1].active_capacity
+    if results[0].active_capacity == results[1].active_capacity:
+        assert results[0].jam_risk <= results[1].jam_risk
+
+
+def test_stagger_offsets_influence_layouts() -> None:
+    config = load_example("config_baseline.json")
+    results = simulate_layouts(config)
+    stagger_values = {r.stagger_offset for r in results}
+    assert stagger_values

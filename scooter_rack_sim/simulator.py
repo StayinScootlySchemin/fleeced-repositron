@@ -13,6 +13,13 @@ class Rect:
     max_y: float
 
 
+@dataclass(frozen=True)
+class LayoutCandidate:
+    holes: tuple[int, ...]
+    lane_spacing: float
+    stagger_offset: float
+
+
 def rectangles_overlap(a: Rect, b: Rect, clearance: float = 0.0) -> bool:
     return not (
         a.max_x + clearance <= b.min_x
@@ -53,7 +60,8 @@ def evaluate_feasibility(config: Config) -> tuple[bool, tuple[str, ...]]:
 
 def _generate_holes(config: Config) -> list[int]:
     count = int(config.rack.width // config.hole_pitch) + 1
-    return [idx for idx in range(count) if idx not in set(config.unusable_holes)]
+    unusable = set(config.unusable_holes)
+    return [idx for idx in range(count) if idx not in unusable]
 
 
 def _deck_rect(center_x: float, config: Config) -> Rect:
@@ -86,14 +94,21 @@ def _pair_jam_risk(x1: float, x2: float, stagger_offset: float, config: Config) 
 
     risk = 0.0
     for rect_a, rect_b, weight in [
-        (deck1, deck2, 0.6),
-        (deck1, bar2, 1.0),
-        (bar1, deck2, 1.0),
-        (bar1, bar2, 0.8),
+        (deck1, deck2, 0.2),
+        (deck1, bar2, 0.8),
+        (bar1, deck2, 0.8),
+        (bar1, bar2, 1.0),
     ]:
         if rectangles_overlap(rect_a, rect_b, clearance=0.0):
             risk += weight
-    return min(1.0, risk / 2.5)
+
+    lateral_gap = abs(x2 - x1) - config.scooter.handlebar_width
+    if lateral_gap > config.constraints.side_clearance:
+        risk *= 0.6
+    elif lateral_gap > 0:
+        risk *= 0.85
+
+    return min(1.0, risk / 2.8)
 
 
 def _layout_jam_risk(centers: list[float], stagger_offset: float, config: Config) -> float:
@@ -113,6 +128,24 @@ def _access_factor(config: Config) -> float:
     if sides & {"left", "right"}:
         return 0.9
     return 0.75
+
+
+def _generate_candidates(config: Config, holes: list[int]) -> list[LayoutCandidate]:
+    candidates: list[LayoutCandidate] = []
+    for lane_spacing_holes in range(1, min(8, len(holes)) + 1):
+        selected_holes = tuple(holes[::lane_spacing_holes])
+        if not selected_holes:
+            continue
+        spacing_mm = lane_spacing_holes * config.hole_pitch
+        for stagger in config.constraints.stagger_offsets:
+            candidates.append(
+                LayoutCandidate(
+                    holes=selected_holes,
+                    lane_spacing=spacing_mm,
+                    stagger_offset=stagger,
+                )
+            )
+    return candidates
 
 
 def simulate_layouts(config: Config) -> list[LayoutResult]:
@@ -135,33 +168,25 @@ def simulate_layouts(config: Config) -> list[LayoutResult]:
         return []
 
     results: list[LayoutResult] = []
-    layout_id = 1
-    centers = [h * config.hole_pitch for h in holes]
+    access_factor = _access_factor(config)
 
-    for lane_spacing_holes in range(1, min(8, len(holes)) + 1):
-        selected_holes = holes[::lane_spacing_holes]
-        if not selected_holes:
-            continue
-        selected_centers = [h * config.hole_pitch for h in selected_holes]
-        spacing_mm = lane_spacing_holes * config.hole_pitch
+    for layout_id, candidate in enumerate(_generate_candidates(config, holes), start=1):
+        selected_centers = [h * config.hole_pitch for h in candidate.holes]
+        jam = _layout_jam_risk(selected_centers, candidate.stagger_offset, config)
+        raw_capacity = len(candidate.holes) * access_factor
+        active_capacity = int(max(0, round(raw_capacity * (1.0 - 0.5 * jam))))
 
-        for stagger in config.constraints.stagger_offsets:
-            jam = _layout_jam_risk(selected_centers, stagger, config)
-            capacity = int(len(selected_holes) * _access_factor(config))
-            if spacing_mm >= config.scooter.handlebar_width + config.constraints.side_clearance:
-                jam *= 0.75
-            results.append(
-                LayoutResult(
-                    layout_id=layout_id,
-                    active_capacity=capacity,
-                    jam_risk=round(jam, 4),
-                    lane_spacing=spacing_mm,
-                    stagger_offset=stagger,
-                    holes=tuple(selected_holes),
-                    feasibility_notes=notes,
-                )
+        results.append(
+            LayoutResult(
+                layout_id=layout_id,
+                active_capacity=active_capacity,
+                jam_risk=round(jam, 4),
+                lane_spacing=candidate.lane_spacing,
+                stagger_offset=candidate.stagger_offset,
+                holes=candidate.holes,
+                feasibility_notes=notes,
             )
-            layout_id += 1
+        )
 
     results.sort(key=lambda r: (-r.active_capacity, r.jam_risk, -r.lane_spacing))
     return results[: config.top_n]

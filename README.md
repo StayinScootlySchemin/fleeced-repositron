@@ -5,6 +5,18 @@ Python package `scooter_rack_sim` simulates scooter rack layouts and ranks candi
 - Active capacity (higher is better)
 - Jam/collision risk from a simple top-view 2-rectangle model (deck + handlebar)
 
+## Is this a project or a repo starter?
+
+This should be treated as a **single focused Python project**. The current structure is intentionally minimal and scalable:
+
+- `scooter_rack_sim/` - core package
+- `tests/` - automated checks
+- `examples/` - canned JSON configs
+- `docs/` - structure and project notes
+- `.github/` - CI and issue/PR templates
+
+See `docs/PROJECT_STRUCTURE.md` for a practical GitHub organization guide.
+
 ## Install
 
 ```bash
